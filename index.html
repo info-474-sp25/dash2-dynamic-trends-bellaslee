@@ -22,8 +22,24 @@
     <!-- INTERACTIVE WIDGETS -->
     <div class="item horizontal-container">
         <div class="item"><!-- Your widget 1 code goes here. -->
-            <!-- Widget 1 title -->
-            <!-- Widget 1 element -->
+            <!-- Injury Type Dropdown -->
+            <div class="widget">
+                <label for="injurySelect">Select injury type:</label>
+
+                <div class="select-container">
+                    <select id="injurySelect">
+                        <option value="Fatal">Fatal</option>
+                        <option value="Incident">Incident</option>
+                        <option value="Non-Fatal">Non-Fatal</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="item">
+            <div class="widget">
+                <label for="trendline-toggle">Show Trendline</label>
+                <input type="checkbox" id="trendline-toggle">
+            </div>
         </div>
     </div>
 
@@ -31,13 +47,7 @@
     <div class="item chart-container">
         <h2>Total Aircraft Incidents Per Year</h2>
         <svg id="lineChart1" width="900" height="400"></svg>
-        <!-- If you change this ID name, you must change it in main.js too -->
     </div>
-    <!-- DELETE THE FOLLOWING DIV IF YOU ONLY HAVE 1 CHART. -->
-    <!-- <div class="item chart-container">
-        <h2>Total Injuries by Weather Condition</h2>
-        <svg id="lineChart2" width="900" height="400"></svg>
-    </div> -->
     <script src="main.js"></script>
 </body>
 

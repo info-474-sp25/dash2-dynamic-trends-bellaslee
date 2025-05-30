@@ -11,24 +11,14 @@ const svgLine = d3.select("#lineChart1") // If you change this ID, you must chan
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-// const svgBar = d3.select("#lineChart2")
-//     .append("svg")
-//     .attr("width", width + margin.left + margin.right)
-//     .attr("height", height + margin.top + margin.bottom)
-//     .append("g")
-//     .attr("transform", `translate(${margin.left},${margin.top})`);
-
-// (If applicable) Tooltip element for interactivity
-// const tooltip = ...
-
 // 2.a: LOAD...
 d3.csv("data.csv").then(data => {
-    // 2.b: ... AND TRANSFORM DATA
     data.forEach(d => {
         d.year = new Date(d.Event_Date).getFullYear();
+        d.severity = d.Injury_Severity.replace(/\s*\(.*?\)\s*/g, "").trim();
     })
 
-    const cleanData = data.filter(d => d.Injury_Severity != "Unavailable"
+    const cleanData = data.filter(d => d.severity != "Unavailable"
         && d.year != null
     )
 
@@ -40,33 +30,48 @@ d3.csv("data.csv").then(data => {
         d => d.year
     );
 
-    const lineData = Array.from(dataMap, ([year, accidents]) => ({ year, accidents }))
-        .sort((a, b) => b.year - a.year);
+    const groupedData = d3.rollups(
+        cleanData,
+        v => v.length,
+        d => d.severity,
+        d => d.year
+    );
 
-    console.log("Data map: ", dataMap);
-    console.log("Line data: ", lineData)
+    const lineDataBySeverity = new Map(
+        groupedData.map(([severity, entries]) => [
+            severity,
+            entries.map(([year, count]) => ({ year, count }))
+                .sort((a, b) => a.year - b.year)
+        ])
+    );
+    console.log("Line data by severity:", lineDataBySeverity);
+
+    // Flatten all grouped data into a single array for computing global extents
+    const allLineData = Array.from(lineDataBySeverity.values()).flat();
+
 
     // 3.a: SET SCALES FOR CHART 1
     let xYear = d3.scaleLinear()
-        .domain([d3.min(lineData, d => d.year), d3.max(lineData, d => d.year)])
+        .domain(d3.extent(allLineData, d => d.year))
         .range([0, width]);
 
     let yAccidents = d3.scaleLinear()
-        .domain([0, d3.max(lineData, d => d.accidents)])
+        .domain([0, d3.max(allLineData, d => d.count)])
         .range([height, 0]);
 
     const line = d3.line()
         .x(d => xYear(d.year))
-        .y(d => yAccidents(d.accidents));
+        .y(d => yAccidents(d.count));
 
 
     // 4.a: PLOT DATA FOR CHART 1
-    svgLine.append("path")
-        .datum(lineData)
-        .attr("d", line)
-        .attr("stroke", "salmon")
-        .attr("stroke-width", 2)
-        .attr("fill", "none");
+    // svgLine.append("path.data-line")
+    //     .datum(lineData)
+    //     .attr("d", line)
+    //     .attr("stroke", "salmon")
+    //     .attr("stroke-width", 2)
+    //     .attr("fill", "none")
+    //     .attr("class", "data-line");
 
     // 5.a: ADD AXES FOR CHART 1
     svgLine.append("g")
@@ -86,26 +91,95 @@ d3.csv("data.csv").then(data => {
         .attr("y", -margin.left / 2 - 10)
         .text("Number of Incidents")
 
-    // 7.a: ADD INTERACTIVITY FOR CHART 1
 
+    // 7.a: INTERACTIVITY
+    function linearRegression(data) {
+        const n = data.length;
+        const sumX = d3.sum(data, d => d.year);
+        const sumY = d3.sum(data, d => d.count);
+        const sumXY = d3.sum(data, d => d.year * d.count);
+        const sumX2 = d3.sum(data, d => d.year * d.year);
 
-    // ==========================================
-    //         CHART 2 (if applicable)
-    // ==========================================
+        // Calculate slope (m) and intercept (b)
+        const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const b = (sumY - m * sumX) / n;
 
-    // 3.b: SET SCALES FOR CHART 2
+        // Generate points for the trendline
+        const trendlineData = data.map(d => ({
+            year: d.year,
+            count: m * d.year + b
+        }));
 
+        return trendlineData;
+    };
 
-    // 4.b: PLOT DATA FOR CHART 2
+    // Function to draw the trendline if the checkbox is checked
+    function drawTrendline(selectedCategory) {
+        const filteredData = lineDataBySeverity.get(selectedCategory) || [];
+        if (filteredData.length === 0) return;
 
+        const trendlineData = linearRegression(filteredData);
 
-    // 5.b: ADD AXES FOR CHART 
+        // Remove the previous trendline if it exists
+        svgLine.selectAll(".trendline").remove();
 
+        // Add the trendline path
+        svgLine.append("path")
+            .datum(trendlineData)
+            .attr("class", "trendline")
+            .attr("d", d3.line()
+                .x(d => xYear(d.year))
+                .y(d => yAccidents(d.count))
+            )
+            .attr("fill", "none")
+            .attr("stroke", "gray")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", "5,5");
+    }
 
-    // 6.b: ADD LABELS FOR CHART 2
+    function updateChart(selected) {
+        const filteredData = lineDataBySeverity.get(selected) || [];
 
+        // Remove existing lines
+        svgLine.selectAll("path.data-line").remove();
+        svgLine.selectAll(".trendline").remove(); // Remove the previous trendline
 
-    // 7.b: ADD INTERACTIVITY FOR CHART 2
+        // Add new line
+        svgLine.append("path")
+            .datum(filteredData)
+            .attr("class", "data-line")
+            .attr("d", d3.line()
+                .x(d => xYear(d.year))
+                .y(d => yAccidents(d.count))
+            )
+            .style("stroke", "salmon")
+            .style("fill", "none")
+            .style("stroke-width", 2);
 
+        // Redraw the trendline automatically after the category changes
+        if (d3.select("#trendline-toggle").property("checked")) {
+            drawTrendline(selected); // Draw the trendline if the checkbox is checked
+        }
+    }
 
+    updateChart("Fatal");
+    console.log("Filtered data for Fatal:", lineDataBySeverity.get("Fatal"));
+    console.log("Available injury severities:", Array.from(new Set(cleanData.map(d => d.severity))));
+
+    // Event listeners
+    d3.select("#trendline-toggle").on("change", function () {
+        const isChecked = d3.select(this).property("checked");
+        const selectedCategory = d3.select("#injurySelect").property("value");
+
+        if (isChecked) {
+            drawTrendline(selectedCategory);
+        } else {
+            svgLine.selectAll(".trendline").remove();
+        }
+    });
+
+    d3.select("#injurySelect").on("change", function () {
+        var selected = d3.select(this).property("value");
+        updateChart(selected); // Update the chart based on the selected option
+    });
 });
