@@ -162,7 +162,7 @@ d3.csv("data.csv").then(data => {
         }
     }
 
-    updateChart("Fatal");
+    updateChart("Incident");
     console.log("Filtered data for Fatal:", lineDataBySeverity.get("Fatal"));
     console.log("Available injury severities:", Array.from(new Set(cleanData.map(d => d.severity))));
 
